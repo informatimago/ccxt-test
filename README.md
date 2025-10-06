@@ -20,6 +20,10 @@ pip install -r requirements.txt
 
 2) Get a **GGUF** model (e.g., LLaMA-2-7B-Chat Q4_K_M), set path in `config.yaml → llm.model_path`.
 
+cf.
+https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF
+https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/blob/main/llama-2-7b-chat.Q4_K_M.gguf
+
 3) API keys are loaded from `~/.apikeys`:
 ```
 # name <ccxt-id> label <label> apikey <KEY> secret <SECRET> password <PASS-or-"">
