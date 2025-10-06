@@ -28,6 +28,27 @@ Edit `config.yaml`:
 - `dry_run`: `true` (paper) by default
 - Add your API keys **only** if you want live trading
 
+### 🔐 Credentials from `~/.apikeys`
+
+Create a file at `~/.apikeys` (or `~/.config/apikeys`) with whitespace key–value pairs per line:
+
+```
+# name <ccxt-exchange-id> label <label> apikey <KEY> secret <SECRET> password <PASS-or-empty>
+name binance label prod  apikey ABC123 secret XYZ456 password ""
+name binance label paper apikey ABC789 secret XYZ999 password ""
+name kraken  label prod  apikey KRAKEY secret KRASEC password KRA_PW
+```
+
+Then select which to use via `config.yaml`:
+
+```yaml
+exchange:
+  name: binance
+  auth_label: "prod"   # or "paper"; if empty, match by name
+```
+
+> Set file permissions: `chmod 600 ~/.apikeys`.
+
 4. **Run**
 ```bash
 python agent.py

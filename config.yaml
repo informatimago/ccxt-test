@@ -1,22 +1,20 @@
 # Default configuration
 exchange:
   name: binance
-  apiKey: ""   # put your key if live
-  secret: ""   # put your secret if live
-  password: "" # some exchanges need it; else leave blank
+  auth_label: "test"
   enableRateLimit: true
 
 trading:
   symbols: ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
   timeframe: "1d"
-  lookback_days: 180
-  polling_minutes: 60
+  lookback_days: 40
+  polling_minutes: 1440
   base_order_size_usd: 50     # nominal per signal (position sizing is simplistic here)
   dry_run: true               # paper trading by default
   max_positions_per_symbol: 1 # naive limit
 
 llm:
-  model_path: "/path/to/your/model.gguf"  # e.g., /models/llama-2-7b-chat.Q4_K_M.gguf
+  model_path: "/usr/local/share/models/llama2/llama-2-7b-chat.Q3_K_M.gguf"  # e.g., /models/llama-2-7b-chat.Q4_K_M.gguf
   n_ctx: 4096
   n_threads: 6
   temperature: 0.3

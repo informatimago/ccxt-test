@@ -1,10 +1,11 @@
 from __future__ import annotations
 import time, json, math, traceback
 import ccxt
-import pandas as pd
-from datetime import datetime, timedelta, timezone
 import yaml
-from llm.py import LLMClient
+import pandas as pd
+from auth import load_api_credentials
+from datetime import datetime, timedelta, timezone
+from llm import LLMClient
 from paper_broker import PaperBroker
 
 def utc_ms(dt: datetime) -> int:
@@ -16,16 +17,18 @@ def fetch_ohlcv_df(exchange, symbol: str, timeframe: str, since_ms: int, limit: 
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
     return df
 
+
 def build_exchange(cfg):
-    ex_name = cfg["exchange"]["name"]
-    ex_class = getattr(ccxt, ex_name)
-    params = dict(
-        apiKey=cfg["exchange"].get("apiKey") or None,
-        secret=cfg["exchange"].get("secret") or None,
-        password=cfg["exchange"].get("password") or None,
-        enableRateLimit=cfg["exchange"].get("enableRateLimit", True)
-    )
-    return ex_class(params)
+    ex_class = getattr(ccxt, cfg["exchange"]["name"])
+    label = cfg["exchange"].get("auth_label") or None
+    creds = load_api_credentials(cfg["exchange"]["name"], preferred_label=label)
+    return ex_class({
+            "apiKey": creds.get("apiKey"),
+            "secret": creds.get("secret"),
+            "password": creds.get("password"),
+            "enableRateLimit": True
+          })
+
 
 def main():
     with open("config.yaml", "r") as f:
@@ -55,6 +58,7 @@ def main():
     while True:
         try:
             # 1) Pull data
+            print(f"Pull data {timeframe}");
             data_by_symbol = {}
             last_prices = {}
             for sym in symbols:
