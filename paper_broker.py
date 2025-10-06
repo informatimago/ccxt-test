@@ -45,7 +45,6 @@ class Portfolio:
             pos = self.positions.get(symbol, Position(symbol=symbol, size=0.0, avg_price=0.0))
             pos.size -= size
             if pos.size <= 1e-12:
-                # position closed
                 self.positions.pop(symbol, None)
             else:
                 self.positions[symbol] = pos

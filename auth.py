@@ -8,6 +8,10 @@ AK_PATHS = [
 ]
 
 def parse_apikeys(path: str) -> list[dict]:
+    """
+    Very simple parser for a whitespace-separated .authinfo-like file.
+    Fields per line (order-insensitive): name label apikey secret password
+    """
     entries = []
     if not os.path.exists(path):
         return entries
@@ -35,6 +39,14 @@ def parse_apikeys(path: str) -> list[dict]:
     return entries
 
 def load_api_credentials(exchange_name: str, preferred_label: Optional[str] = None) -> Dict[str, Optional[str]]:
+    """
+    Find credentials by trying, in order:
+      1) name==exchange_name AND label==preferred_label
+      2) label==preferred_label (any name)
+      3) name==exchange_name (any label)
+      4) first entry
+    Returns dict with keys: apiKey, secret, password
+    """
     entries = []
     for p in AK_PATHS:
         if os.path.exists(p):

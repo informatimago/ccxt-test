@@ -4,14 +4,26 @@ exchange:
   auth_label: "test"
   enableRateLimit: true
 
+
 trading:
+  mode: "historic"                 # live | historic
   symbols: ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
   timeframe: "1d"
   lookback_days: 40
-  polling_minutes: 1440
-  base_order_size_usd: 50     # nominal per signal (position sizing is simplistic here)
-  dry_run: true               # paper trading by default
-  max_positions_per_symbol: 1 # naive limit
+  base_order_size_usd: 50
+  max_positions_per_symbol: 1
+  historic_start: "2025-07-01"
+
+# trading:
+#   mode: "live"                 # live | historic
+#   symbols: ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
+#   timeframe: "1d"
+#   lookback_days: 40
+#   polling_minutes: 60          # live mode only
+#   base_order_size_usd: 50
+#   dry_run: true                # live mode: paper trading
+#   max_positions_per_symbol: 1
+#   historic_start: ""           # e.g., "2024-01-01" to enable historic mode
 
 llm:
   model_path: "/usr/local/share/models/llama2/llama-2-7b-chat.Q3_K_M.gguf"  # e.g., /models/llama-2-7b-chat.Q4_K_M.gguf

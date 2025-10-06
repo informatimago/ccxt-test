@@ -49,9 +49,6 @@ JSON Schema (informal):
 """
 
 def format_summary(symbol: str, df) -> str:
-    """Compact textual summary of OHLCV daily data for prompting."""
-    # df expected columns: timestamp, open, high, low, close, volume
-    # We keep last 60 rows for brevity
     tail = df.tail(60)
     closes = [round(float(x), 6) for x in tail["close"].tolist()]
     vols = [round(float(x), 6) for x in tail["volume"].tolist()]
@@ -74,7 +71,7 @@ class LLMClient:
 
     def decide(self, data_by_symbol: Dict[str, Any]) -> LLMResponse:
         symbols = list(data_by_symbol.keys())
-        summaries = "\n".join(format_summary(sym, df) for sym, df in data_by_symbol.items())
+        summaries = "\\n".join(format_summary(sym, df) for sym, df in data_by_symbol.items())
         user_prompt = USER_PROMPT_TEMPLATE.format(symbols=", ".join(symbols), summaries=summaries)
 
         messages = [
@@ -82,20 +79,17 @@ class LLMClient:
             {"role":"user", "content": user_prompt}
         ]
 
-        # llama_cpp chat completion
         out = self.llm.create_chat_completion(messages=messages, **self.gen_kwargs)
         content = out["choices"][0]["message"]["content"].strip()
-        # Defensive: sometimes models wrap code fences
         if content.startswith("```"):
             content = content.strip("`")
-            # remove potential "json" header line
-            content = "\n".join([ln for ln in content.splitlines() if not ln.strip().lower().startswith("json")])
+            content = "\\n".join([ln for ln in content.splitlines() if not ln.strip().lower().startswith("json")])
 
         try:
             data = json.loads(content)
             return LLMResponse(**data)
-        except (json.JSONDecodeError, ValidationError) as e:
-            # Fallback to HOLD/NO_TRADE on failure
+        except (json.JSONDecodeError, ValidationError):
+            # Fallback to HOLD/NO_TRADE
             assets = [AssetDecision(symbol=s, action="HOLD", confidence=0.0, comment="LLM parse error fallback") for s in symbols]
             pairs = []
             for i in range(len(symbols)):
