@@ -1,11 +1,15 @@
 # CCXT + Local LLaMA Crypto Trading Agent (Live & Historic)
 
+
+See `config.yaml` for `llm_input.mode: raw|talib`. Historic mode writes `backtest_equity.csv`.
+
 Minimal **Python** template that:
 - Uses **CCXT** to fetch OHLCV (default: `BTC/USDT`, `ETH/USDT`, `DOGE/USDT`).
 - Summarizes the last `lookback_days` of daily data.
 - Asks a **local LLaMA (GGUF via `llama-cpp-python`)** for **BUY/SELL/HOLD** per asset + pair-trade ideas.
 - **Live mode**: paper-trades by default; can place real orders if you set `dry_run: false` and provide API keys.
 - **Historic mode**: runs a **moving-window backtest** starting at `trading.historic_start` and executes at **next bar's open**. Outputs `backtest_equity.csv`.
+- New option: feed **TA-Lib compact summaries** to the LLM instead of raw candles.
 
 > ⚠️ **Disclaimer**: Educational only. Trading risk is yours.
 
@@ -49,6 +53,11 @@ python agent.py
 - Uses a **moving window** of `lookback_days` bars.
 - At each step *t*, LLM sees bars up to *t*; orders are executed at **next bar's open**.
 - Uses paper broker only and writes `backtest_equity.csv` (`timestamp,equity,cash`).
+
+### Use of talib indicators
+
+See `config.yaml` for `llm_input.mode: raw|talib`. Historic mode writes `backtest_equity.csv`.
+
 
 ## Files
 

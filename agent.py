@@ -1,5 +1,5 @@
 from __future__ import annotations
-import time, json, math, traceback
+import time, json, math, traceback, itertools
 import ccxt
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -7,6 +7,7 @@ import yaml
 from llm import LLMClient
 from paper_broker import PaperBroker
 from auth import load_api_credentials
+from features_talib import compact_features, pair_features
 
 def utc_ms(dt: datetime) -> int:
     return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
@@ -35,8 +36,18 @@ def build_exchange(cfg):
     )
     return ex_class(params)
 
+def compute_pair_text(symbols, dfs, cfg):
+    talib_cfg = (cfg.get("llm_input") or {}).get("talib") or {}
+    if not talib_cfg.get("enable_pair_features", True):
+        return ""
+    lines = []
+    for a, b in itertools.combinations(symbols, 2):
+        if a in dfs and b in dfs:
+            feats = pair_features(dfs[a], dfs[b])
+            lines.append(f"- {a} vs {b}: ratio_z={feats['ratio_z']}, ratio_bb_pos_b={feats['ratio_bb_pos_b']}, ratio_bb_width={feats['ratio_bb_width']}")
+    return "\\n".join(lines)
+
 def run_live(cfg):
-    print("Live Run");
     symbols = cfg["trading"]["symbols"]
     timeframe = cfg["trading"]["timeframe"]
     lookback_days = int(cfg["trading"]["lookback_days"])
@@ -44,9 +55,13 @@ def run_live(cfg):
     base_order_size_usd = float(cfg["trading"]["base_order_size_usd"])
     dry_run = bool(cfg["trading"]["dry_run"])
 
+    input_mode = ((cfg.get("llm_input") or {}).get("mode") or "raw").lower()
+    talib_cfg = (cfg.get("llm_input") or {}).get("talib") or {}
+    pattern_whitelist = talib_cfg.get("pattern_whitelist", [])
+
     exchange = build_exchange(cfg)
     exchange.load_markets()
-    llm = LLMClient(cfg["llm"])
+    llm = LLMClient(cfg["llm"], input_mode=input_mode)
     paper = PaperBroker(base_cash_usd=10000.0)
 
     since_dt = datetime.utcnow() - timedelta(days=lookback_days + 5)
@@ -54,20 +69,27 @@ def run_live(cfg):
 
     while True:
         try:
-            data_by_symbol = {}
+            dfs = {}
             last_prices = {}
             for sym in symbols:
                 df = fetch_ohlcv_df(exchange, sym, timeframe, since_ms)
                 if df.empty:
                     continue
-                data_by_symbol[sym] = df
+                dfs[sym] = df
                 last_prices[sym] = float(df["close"].iloc[-1])
-            if not data_by_symbol:
+
+            if not dfs:
                 print("No data; sleeping...")
                 time.sleep(polling_minutes * 60)
                 continue
 
-            decisions = llm.decide(data_by_symbol)
+            if input_mode == "talib":
+                data_by_symbol = {sym: compact_features(df, pattern_whitelist=pattern_whitelist) for sym, df in dfs.items()}
+                pair_text = compute_pair_text(symbols, dfs, cfg)
+                decisions = llm.decide(data_by_symbol, pair_text=pair_text)
+            else:
+                decisions = llm.decide(dfs)
+
             print("LLM decisions:", decisions.model_dump())
 
             for asset in decisions.assets:
@@ -112,18 +134,14 @@ def run_live(cfg):
         time.sleep(polling_minutes * 60)
 
 def run_historic(cfg):
-    """
-    Historic/backtest mode:
-    - Window length = lookback_days.
-    - Start at trading.historic_start (inclusive).
-    - At step t, decisions use data up to bar t; orders execute at NEXT bar's open.
-    - PaperBroker only. Writes backtest_equity.csv.
-    """
-    print("Historic Run");
     symbols = cfg["trading"]["symbols"]
     timeframe = cfg["trading"]["timeframe"]
     lookback_days = int(cfg["trading"]["lookback_days"])
     base_order_size_usd = float(cfg["trading"]["base_order_size_usd"])
+
+    input_mode = ((cfg.get("llm_input") or {}).get("mode") or "raw").lower()
+    talib_cfg = (cfg.get("llm_input") or {}).get("talib") or {}
+    pattern_whitelist = talib_cfg.get("pattern_whitelist", [])
 
     historic_start_str = (cfg["trading"].get("historic_start") or "").strip()
     if not historic_start_str:
@@ -132,10 +150,9 @@ def run_historic(cfg):
 
     exchange = build_exchange(cfg)
     exchange.load_markets()
-    llm = LLMClient(cfg["llm"])
+    llm = LLMClient(cfg["llm"], input_mode=input_mode)
     paper = PaperBroker(base_cash_usd=10000.0)
 
-    # Fetch from (historic_start - lookback padding) to present
     since_dt = start_dt - timedelta(days=lookback_days + 5)
     since_ms = utc_ms(since_dt)
 
@@ -147,7 +164,6 @@ def run_historic(cfg):
         dfs[sym] = df
 
     min_len = min(len(df) for df in dfs.values())
-    # find first index >= start_dt for all symbols
     first_idxs = []
     for sym, df in dfs.items():
         idxs = df.index[df["timestamp"] >= pd.Timestamp(start_dt)]
@@ -159,31 +175,34 @@ def run_historic(cfg):
     if start_idx < lookback_days:
         raise RuntimeError(f"Not enough lookback history before {historic_start_str}. Choose a later start or increase padding.")
 
-    # iterate until we still have a next bar for execution
     end_idx_exclusive = min_len - 1
 
     equity_rows = []
     step_count = 0
     for idx in range(start_idx, end_idx_exclusive):
-        print(f"Processing date index {idx}")
-        data_by_symbol = {}
-        next_prices = {}
-
         if idx + 1 >= min_len:
             break
 
+        window_by_symbol = {}
+        next_prices = {}
         for sym, df in dfs.items():
             if idx - (lookback_days - 1) < 0:
                 break
             window = df.iloc[idx - (lookback_days - 1): idx + 1].copy()
-            data_by_symbol[sym] = window
+            window_by_symbol[sym] = window
             next_open = float(df["open"].iloc[idx + 1])
             next_prices[sym] = next_open
 
-        if len(data_by_symbol) != len(symbols):
+        if len(window_by_symbol) != len(symbols):
             continue
 
-        decisions = llm.decide(data_by_symbol)
+        if input_mode == "talib":
+            data_by_symbol = {sym: compact_features(win, pattern_whitelist=pattern_whitelist)
+                              for sym, win in window_by_symbol.items()}
+            pair_lines = compute_pair_text(symbols, window_by_symbol, cfg)
+            decisions = llm.decide(data_by_symbol, pair_text=pair_lines)
+        else:
+            decisions = llm.decide(window_by_symbol)
 
         for asset in decisions.assets:
             sym = asset.symbol

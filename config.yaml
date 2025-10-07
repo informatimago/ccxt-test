@@ -31,3 +31,12 @@ llm:
   n_threads: 6
   temperature: 0.3
   top_p: 0.9
+
+llm_input:
+  mode: "talib"       # "raw" or "talib"
+  talib:
+    enable_pair_features: true
+    pattern_whitelist: ["CDLENGULFING","CDLDOJI","CDLMORNINGSTAR","CDLEVENINGSTAR","CDLHARAMI"]
+
+# CDLHAMMER, CDLINVERTEDHAMMER, CDLSHOOTINGSTAR, CDLPIERCING, CDLDARKCLOUDCOVER, CDL3WHITESOLDIERS, CDL3BLACKCROWS, CDLHARAMICROSS, CDLSPINNINGTOP, CDLMARUBOZU.
+# Tip: keep the whitelist short to reduce noise; more patterns = more false positives.
