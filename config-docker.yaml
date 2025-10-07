@@ -1,0 +1,42 @@
+# Default configuration
+exchange:
+  name: binance
+  auth_label: "test"
+  enableRateLimit: true
+
+
+trading:
+  mode: "historic"                 # live | historic
+  symbols: ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
+  timeframe: "1d"
+  lookback_days: 40
+  base_order_size_usd: 50
+  max_positions_per_symbol: 1
+  historic_start: "2025-07-01"
+
+# trading:
+#   mode: "live"                 # live | historic
+#   symbols: ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
+#   timeframe: "1d"
+#   lookback_days: 40
+#   polling_minutes: 60          # live mode only
+#   base_order_size_usd: 50
+#   dry_run: true                # live mode: paper trading
+#   max_positions_per_symbol: 1
+#   historic_start: ""           # e.g., "2024-01-01" to enable historic mode
+
+llm:
+  model_path: "/models/llama2/llama-2-7b-chat.Q4_K_M.gguf"
+  n_ctx: 4096
+  n_threads: 6
+  temperature: 0.3
+  top_p: 0.9
+
+llm_input:
+  mode: "talib"       # "raw" or "talib"
+  talib:
+    enable_pair_features: true
+    pattern_whitelist: ["CDLENGULFING","CDLDOJI","CDLMORNINGSTAR","CDLEVENINGSTAR","CDLHARAMI"]
+
+# CDLHAMMER, CDLINVERTEDHAMMER, CDLSHOOTINGSTAR, CDLPIERCING, CDLDARKCLOUDCOVER, CDL3WHITESOLDIERS, CDL3BLACKCROWS, CDLHARAMICROSS, CDLSPINNINGTOP, CDLMARUBOZU.
+# Tip: keep the whitelist short to reduce noise; more patterns = more false positives.
